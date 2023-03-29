@@ -13,7 +13,7 @@ workspace("Backtrace")
 		warnings("Extra")
 
 		kind("StaticLib")
-		common:outDirs(true)
+		common:outDirs()
 
 		includedirs({ "Inc/" })
 		files({
