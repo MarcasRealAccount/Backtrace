@@ -271,7 +271,7 @@ namespace Backtrace
 		}
 	}
 
-	void AssertImpl(bool condition, std::string_view message)
+	inline void AssertImpl(bool condition, std::string_view message)
 	{
 		if constexpr (CommonBuild::c_IsConfigDebug)
 		{

@@ -13,7 +13,8 @@ workspace("Backtrace")
 		warnings("Extra")
 
 		kind("StaticLib")
-		common:outDirs()
+		targetdir("%{wks.location}/Backtrace/%{cfg.buildcfg}")
+		objdir("%{wks.location}/Backtrace/%{cfg.buildcfg}")
 
 		includedirs({ "Inc/" })
 		files({
