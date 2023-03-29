@@ -25,11 +25,24 @@ namespace Backtrace
 			: m_Line(0),
 			  m_Column(0) {}
 
+		SourceLocation(const SourceLocation& copy)
+			: m_File(copy.m_File),
+			  m_Function(copy.m_Function),
+			  m_Line(copy.m_Line),
+			  m_Column(copy.m_Column) {}
+
 		SourceLocation(SourceLocation&& move) noexcept
 			: m_File(std::move(move.m_File)),
 			  m_Function(std::move(move.m_Function)),
 			  m_Line(move.m_Line),
 			  m_Column(move.m_Column) {}
+
+		SourceLocation& operator=(const SourceLocation& copy)
+		{
+			m_File     = copy.m_File;
+			m_Function = copy.m_Function;
+			return *this;
+		}
 
 		SourceLocation& operator=(SourceLocation&& move) noexcept
 		{
@@ -79,6 +92,13 @@ namespace Backtrace
 			  m_Offset(offset),
 			  m_Source(std::move(source)) {}
 
+		StackFrame(const StackFrame& copy)
+			: m_Address(copy.m_Address),
+			  m_Offset(copy.m_Offset),
+			  m_Source(copy.m_Source)
+		{
+		}
+
 		StackFrame(StackFrame&& move) noexcept
 			: m_Address(move.m_Address),
 			  m_Offset(move.m_Offset),
@@ -86,6 +106,14 @@ namespace Backtrace
 		{
 			move.m_Address = nullptr;
 			move.m_Offset  = 0;
+		}
+
+		StackFrame& operator=(const StackFrame& copy)
+		{
+			m_Address = copy.m_Address;
+			m_Offset  = copy.m_Offset;
+			m_Source  = copy.m_Source;
+			return *this;
 		}
 
 		StackFrame& operator=(StackFrame&& move) noexcept
@@ -168,18 +196,33 @@ namespace Backtrace
 	#endif
 #endif
 
-		Exception(Exception&& exception) noexcept
-			: m_Title(std::move(exception.m_Title)),
-			  m_Message(std::move(exception.m_Message)),
-			  m_Backtrace(std::move(exception.m_Backtrace))
+		Exception(const Exception& copy)
+			: m_Title(copy.m_Title),
+			  m_Message(copy.m_Message),
+			  m_Backtrace(copy.m_Backtrace)
 		{
 		}
 
-		Exception& operator=(Exception&& exception) noexcept
+		Exception(Exception&& move) noexcept
+			: m_Title(std::move(move.m_Title)),
+			  m_Message(std::move(move.m_Message)),
+			  m_Backtrace(std::move(move.m_Backtrace))
 		{
-			m_Title     = std::move(exception.m_Title);
-			m_Message   = std::move(exception.m_Message);
-			m_Backtrace = std::move(exception.m_Backtrace);
+		}
+
+		Exception& operator=(const Exception& copy)
+		{
+			m_Title     = copy.m_Title;
+			m_Message   = copy.m_Message;
+			m_Backtrace = copy.m_Backtrace;
+			return *this;
+		}
+
+		Exception& operator=(Exception&& move) noexcept
+		{
+			m_Title     = std::move(move.m_Title);
+			m_Message   = std::move(move.m_Message);
+			m_Backtrace = std::move(move.m_Backtrace);
 			return *this;
 		}
 
