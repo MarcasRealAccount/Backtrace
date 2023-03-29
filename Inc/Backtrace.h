@@ -8,7 +8,6 @@
 
 #include <Build.h>
 
-#define BACKTRACE_FORMATTING
 #ifdef BACKTRACE_FORMATTING
 	#ifdef BACKTRACE_FMT
 		#include <fmt/format.h>
@@ -238,7 +237,7 @@ namespace Backtrace
 				if constexpr (!CommonBuild::c_IsConfigDist)
 					DebugBreak();
 
-				throw Exception("Assertion", message, Capture(1, 10));
+				throw Exception("Assertion", std::string { message }, Capture(1, 10));
 			}
 		}
 	}
@@ -252,7 +251,7 @@ namespace Backtrace
 		{
 			if (!condition)
 			{
-				if constexpr (!CommonBuild::cIsConfigDist)
+				if constexpr (!CommonBuild::c_IsConfigDist)
 					DebugBreak();
 
 				throw Exception("Assertion", format, std::forward<Args>(args)..., Capture(1, 10));
@@ -267,7 +266,7 @@ namespace Backtrace
 		{
 			if (!condition)
 			{
-				if constexpr (!CommonBuild::cIsConfigDist)
+				if constexpr (!CommonBuild::c_IsConfigDist)
 					DebugBreak();
 
 				throw Exception("Assertion", format, std::forward<Args>(args)..., Capture(1, 10));

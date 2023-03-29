@@ -5,7 +5,7 @@ workspace("Backtrace")
 
 	cppdialect("C++20")
 	rtti("Off")
-	exceptionhandling("Off")
+	exceptionhandling("On")
 	flags("MultiProcessorCompile")
 
 	project("Backtrace")
