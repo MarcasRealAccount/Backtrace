@@ -1,19 +1,20 @@
 local pkg       = premake.extensions.pkg
-local scriptDir = common:scriptDir()
+local scriptDir = pkg:scriptDir()
+local premake   = pkg.builders.premake
 
-local buildTool = pkg:setupPremake("Backtrace", "amd64", { "Debug", "Release", "Dist" }, scriptDir, "build/", "%{targetpath}/%{config}")
+local buildTool = premake:setup("Backtrace", "amd64", { "Debug", "Release", "Dist" }, scriptDir, "build/", "%{targetname}/%{config}")
 buildTool:mapConfigs({
 	Debug = {
 		config  = "Debug",
-		targets = { Backtrace = { path = "Backtrace/", outputFiles = common:libName("Backtrace", true) } }
+		targets = { Backtrace = { path = "Backtrace/", outputFiles = pkg:libName("Backtrace", true) } }
 	},
 	Release = {
 		config  = "Release",
-		targets = { Backtrace = { path = "Backtrace/", outputFiles = common:libName("Backtrace", true) } }
+		targets = { Backtrace = { path = "Backtrace/", outputFiles = pkg:libName("Backtrace", true) } }
 	},
 	Dist = {
 		config  = "Dist",
-		targets = { Backtrace = { path = "Backtrace/", outputFiles = common:libName("Backtrace", false) } }
+		targets = { Backtrace = { path = "Backtrace/", outputFiles = pkg:libName("Backtrace", false) } }
 	}
 })
 buildTool:build()

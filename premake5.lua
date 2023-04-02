@@ -1,7 +1,7 @@
 workspace("Backtrace")
 	location("build/")
-	common:setConfigsAndPlatforms()
-	common:addCoreDefines()
+	common:addConfigs()
+	common:addBuildDefines()
 
 	cppdialect("C++20")
 	rtti("Off")
@@ -22,6 +22,10 @@ workspace("Backtrace")
 			"Src/**"
 		})
 		removefiles({ "*.DS_Store" })
+
+		filter("system:windows")
+			links({ "Dbghelp.lib" })
+		filter({})
 
 		pkgdeps({ "commonbuild" })
 

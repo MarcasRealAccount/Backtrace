@@ -1,3 +1,5 @@
-libdirs({ common:scriptDir() .. string.format("/Bin/%s-%s-", common.host, common.arch) .. "%{cfg.buildcfg}" })
+local pkg = premake.extensions.pkg
+
+libdirs({ pkg:scriptDir() .. string.format("/Bin/%s-%s-", os.host(), pkg.arch) .. "%{cfg.buildcfg}" })
 links({ "Backtrace" })
-externalincludedirs({ common:scriptDir() .. "/Inc/" })
+externalincludedirs({ pkg:scriptDir() .. "/Inc/" })
