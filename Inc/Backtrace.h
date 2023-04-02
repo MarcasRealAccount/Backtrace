@@ -4,15 +4,21 @@
 
 #include <filesystem>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <Build.h>
 
 #ifdef BACKTRACE_FORMATTING
-	#ifdef BACKTRACE_FMT
+	#ifdef BACKTRACE_SPDLOG
+		#include <spdlog/fmt/fmt.h>
+		#define BACKTRACE_USE_FMT
+	#elif defined(BACKTRACE_FMT)
 		#include <fmt/format.h>
+		#define BACKTRACE_USE_FMT
 	#else
 		#include <format>
+		#define BACKTRACE_USE_STD
 	#endif
 #endif
 
@@ -72,6 +78,8 @@ namespace Backtrace
 		auto line() const { return m_Line; }
 
 		auto column() const { return m_Column; }
+
+		std::string toString() const;
 
 	private:
 		std::filesystem::path m_File;
@@ -146,6 +154,8 @@ namespace Backtrace
 
 		bool hasSource() const { return !m_Source.file().empty(); }
 
+		std::string toString() const;
+
 	private:
 		void*          m_Address;
 		std::size_t    m_Offset;
@@ -159,6 +169,8 @@ namespace Backtrace
 
 		auto& frames() const { return m_Frames; }
 
+		std::string toString() const;
+
 	private:
 		std::vector<StackFrame> m_Frames;
 	};
@@ -168,6 +180,16 @@ namespace Backtrace
 	void       HookThrow();
 	void       UnhookThrow();
 
+	enum class EExceptionResult
+	{
+		Ignore,
+		Retry,
+		Abort,
+		Critical
+	};
+
+	EExceptionResult OpenErrorModal(std::string_view title, std::string_view description, const Backtrace& backtrace);
+
 	struct Exception
 	{
 	public:
@@ -176,8 +198,7 @@ namespace Backtrace
 			  m_Message(std::move(message)),
 			  m_Backtrace(std::move(backtrace)) {}
 
-#ifdef BACKTRACE_FORMATTING
-	#ifdef BACKTRACE_FMT
+#ifdef BACKTRACE_USE_FMT
 		template <class... Args>
 		Exception(std::string title, fmt::format_string<Args...> format, Args&&... args, Backtrace backtrace = Capture(0, 10))
 			: m_Title(std::move(title)),
@@ -185,7 +206,7 @@ namespace Backtrace
 			  m_Backtrace(std::move(backtrace))
 		{
 		}
-	#else
+#elif defined(BACKTRACE_USE_STD)
 		template <class... Args>
 		Exception(std::string title, std::format_string<Args...> format, Args&&... args, Backtrace backtrace = Capture(0, 10))
 			: m_Title(std::move(title)),
@@ -193,7 +214,6 @@ namespace Backtrace
 			  m_Backtrace(std::move(backtrace))
 		{
 		}
-	#endif
 #endif
 
 		Exception(const Exception& copy)
@@ -232,42 +252,62 @@ namespace Backtrace
 
 		auto& backtrace() const { return m_Backtrace; }
 
+		std::string toString() const;
+
 	private:
 		std::string m_Title;
 		std::string m_Message;
 		Backtrace   m_Backtrace;
 	};
 
-	using ExceptionCallback = void (*)(const Exception& exception);
+	using ExceptionCallback = EExceptionResult (*)(const Exception& exception);
 
 	ExceptionCallback SetExceptionCallback(ExceptionCallback callback);
 
-	void InvokeExceptionCallback(const Exception& exception);
+	EExceptionResult InvokeExceptionCallback(const Exception& exception);
 
 	void DebugBreak();
 
 	template <class F, class... Args>
 	std::uint32_t SafeExecute(F&& f, Args&&... args)
 	{
-		try
+		while (true)
 		{
-			f(std::forward<Args>(args)...);
-			return 0;
-		}
-		catch (const Exception& exception)
-		{
-			InvokeExceptionCallback(exception);
-			return 0x7FFF'FFFF;
-		}
-		catch (const std::exception& exception)
-		{
-			InvokeExceptionCallback({ "std::exception", exception.what(), LastBacktrace() });
-			return 0x000'7FFF;
-		}
-		catch (...)
-		{
-			InvokeExceptionCallback({ "Uncaught exception", "Uncaught exception occurred", LastBacktrace() });
-			return 0x007F'FFFF;
+			try
+			{
+				f(std::forward<Args>(args)...);
+				return 0;
+			}
+			catch (const Exception& exception)
+			{
+				auto result = InvokeExceptionCallback(exception);
+				if (result == EExceptionResult::Critical)
+					return 0x7FFF'FFFF;
+				else if (result == EExceptionResult::Abort)
+					return 0x007F'FFFF;
+				else if (result == EExceptionResult::Ignore)
+					return 0;
+			}
+			catch (const std::exception& exception)
+			{
+				auto result = InvokeExceptionCallback({ "std::exception", exception.what(), LastBacktrace() });
+				if (result == EExceptionResult::Critical)
+					return 0x7FFF'FFFF;
+				else if (result == EExceptionResult::Abort)
+					return 0x000'7FFF;
+				else if (result == EExceptionResult::Ignore)
+					return 0;
+			}
+			catch (...)
+			{
+				auto result = InvokeExceptionCallback({ "Uncaught exception", "Uncaught exception occurred", LastBacktrace() });
+				if (result == EExceptionResult::Critical)
+					return 0x7FFF'FFFF;
+				else if (result == EExceptionResult::Abort)
+					return 0x0000'007F;
+				else if (result == EExceptionResult::Ignore)
+					return 0;
+			}
 		}
 	}
 
@@ -285,8 +325,7 @@ namespace Backtrace
 		}
 	}
 
-#ifdef BACKTRACE_FORMATTING
-	#ifdef BACKTRACE_FMT
+#ifdef BACKTRACE_USE_FMT
 	template <class... Args>
 	void Assert(bool condition, fmt::format_string<Args...> format, Args&&... args)
 	{
@@ -301,7 +340,7 @@ namespace Backtrace
 			}
 		}
 	}
-	#else
+#elif defined(BACKTRACE_USE_STD)
 	template <class... Args>
 	void Assert(bool condition, std::format_string<Args...> format, Args&&... args)
 	{
@@ -316,6 +355,103 @@ namespace Backtrace
 			}
 		}
 	}
-	#endif
 #endif
 } // namespace Backtrace
+
+#ifdef BACKTRACE_USE_FMT
+template <>
+struct fmt::formatter<Backtrace::SourceLocation>
+{
+public:
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.begin();
+	}
+
+	template <class FormatContext>
+	auto format(const Backtrace::SourceLocation& location, FormatContext& ctx) -> decltype(ctx.out())
+	{
+		return fmt::format_to(ctx.out(), "{}", location.toString());
+	}
+};
+
+template <>
+struct fmt::formatter<Backtrace::Backtrace>
+{
+public:
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.begin();
+	}
+
+	template <class FormatContext>
+	auto format(const Backtrace::Backtrace& backtrace, FormatContext& ctx) -> decltype(ctx.out())
+	{
+		return fmt::format_to(ctx.out(), "{}", backtrace.toString());
+	}
+};
+
+template <>
+struct fmt::formatter<Backtrace::Exception>
+{
+public:
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.begin();
+	}
+
+	template <class FormatContext>
+	auto format(const Backtrace::Exception& exception, FormatContext& ctx) -> decltype(ctx.out())
+	{
+		return fmt::format_to(ctx.out(), "{}", exception.toString());
+	}
+};
+#elif defined(BACKTRACE_USE_STD)
+template <>
+struct std::formatter<Backtrace::SourceLocation>
+{
+public:
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.begin();
+	}
+
+	template <class FormatContext>
+	auto format(const Backtrace::SourceLocation& location, FormatContext& ctx) -> decltype(ctx.out())
+	{
+		return std::format_to(ctx.out(), "{}", location.toString());
+	}
+};
+
+template <>
+struct std::formatter<Backtrace::Backtrace>
+{
+public:
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.begin();
+	}
+
+	template <class FormatContext>
+	auto format(const Backtrace::Backtrace& backtrace, FormatContext& ctx) -> decltype(ctx.out())
+	{
+		return std::format_to(ctx.out(), "{}", backtrace.toString());
+	}
+};
+
+template <>
+struct std::formatter<Backtrace::Exception>
+{
+public:
+	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
+	{
+		return ctx.begin();
+	}
+
+	template <class FormatContext>
+	auto format(const Backtrace::Exception& exception, FormatContext& ctx) -> decltype(ctx.out())
+	{
+		return std::format_to(ctx.out(), "{}", exception.toString());
+	}
+};
+#endif

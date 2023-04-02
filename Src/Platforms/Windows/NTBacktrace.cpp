@@ -107,6 +107,27 @@ namespace Backtrace
 		RemoveVectoredExceptionHandler(g_VectoredExceptionHandler);
 	}
 
+	EExceptionResult OpenErrorModal(std::string_view title, std::string_view description, const Backtrace& backtrace)
+	{
+		std::wstring msg = UTF::CharToWide(description);
+		if (!backtrace.frames().empty())
+			msg += L"\n\n" + UTF::CharToWide(backtrace.toString());
+		std::wstring caption = title.empty()
+								   ? L"Error"
+								   : L"Error: " + UTF::CharToWide(title);
+		int          result  = MessageBoxW(nullptr,
+                                 msg.c_str(),
+                                 caption.c_str(),
+                                 MB_ABORTRETRYIGNORE | MB_ICONERROR | MB_SYSTEMMODAL);
+		switch (result)
+		{
+		case IDABORT: return EExceptionResult::Abort;
+		case IDIGNORE: return EExceptionResult::Ignore;
+		case IDRETRY: return EExceptionResult::Retry;
+		default: return EExceptionResult::Abort;
+		}
+	}
+
 	void DebugBreak()
 	{
 		__debugbreak();
