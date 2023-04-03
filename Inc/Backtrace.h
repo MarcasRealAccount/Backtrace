@@ -196,25 +196,9 @@ namespace Backtrace
 		Exception(std::string title, std::string message, Backtrace backtrace = Capture(0, 10))
 			: m_Title(std::move(title)),
 			  m_Message(std::move(message)),
-			  m_Backtrace(std::move(backtrace)) {}
-
-#ifdef BACKTRACE_USE_FMT
-		template <class... Args>
-		Exception(std::string title, fmt::format_string<Args...> format, Args&&... args, Backtrace backtrace = Capture(0, 10))
-			: m_Title(std::move(title)),
-			  m_Message(fmt::format(format, std::forward<Args>(args)...)),
 			  m_Backtrace(std::move(backtrace))
 		{
 		}
-#elif defined(BACKTRACE_USE_STD)
-		template <class... Args>
-		Exception(std::string title, std::format_string<Args...> format, Args&&... args, Backtrace backtrace = Capture(0, 10))
-			: m_Title(std::move(title)),
-			  m_Message(std::format(format, std::forward<Args>(args)...)),
-			  m_Backtrace(std::move(backtrace))
-		{
-		}
-#endif
 
 		Exception(const Exception& copy)
 			: m_Title(copy.m_Title),
@@ -336,7 +320,7 @@ namespace Backtrace
 				if constexpr (!CommonBuild::c_IsConfigDist)
 					DebugBreak();
 
-				throw Exception("Assertion", format, std::forward<Args>(args)..., Capture(1, 10));
+				throw Exception("Assertion", fmt::format(format, std::forward<Args>(args)...), Capture(1, 10));
 			}
 		}
 	}
@@ -351,7 +335,7 @@ namespace Backtrace
 				if constexpr (!CommonBuild::c_IsConfigDist)
 					DebugBreak();
 
-				throw Exception("Assertion", format, std::forward<Args>(args)..., Capture(1, 10));
+				throw Exception("Assertion", std::format(format, std::forward<Args>(args)...), Capture(1, 10));
 			}
 		}
 	}
