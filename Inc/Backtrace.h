@@ -252,6 +252,14 @@ namespace Backtrace
 
 	void DebugBreak();
 
+	template <class F, class R, class... Args>
+	concept Functor =
+		requires(F&& f, Args&&... args) {
+			{
+				f(std::forward<Args>(args)...)
+				} -> std::same_as<R>;
+		};
+
 	template <class F, class... Args>
 	std::uint32_t SafeExecute(F&& f, Args&&... args)
 	{
@@ -259,8 +267,15 @@ namespace Backtrace
 		{
 			try
 			{
-				f(std::forward<Args>(args)...);
-				return 0;
+				if constexpr (Functor<F, std::uint32_t>)
+				{
+					return f(std::forward<Args>(args)...);
+				}
+				else
+				{
+					f(std::forward<Args>(args)...);
+					return 0;
+				}
 			}
 			catch (const Exception& exception)
 			{
