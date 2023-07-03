@@ -65,13 +65,13 @@ namespace Backtrace
 			frame.setAddress(reinterpret_cast<void*>(symbol->Address), offset);
 
 			SourceLocation source;
-			source.setFunction(UTF::WideToChar(symbol->Name));
+			source.setFunction(UTF::Convert<char, wchar_t>(std::wstring_view(symbol->Name)));
 
 			DWORD            column = 0;
 			IMAGEHLP_LINEW64 line {};
 			line.SizeOfStruct = sizeof(line);
 			if (SymGetLineFromAddrW64(g_Process, reinterpret_cast<std::uint64_t>(address), &column, &line))
-				source.setFile(UTF::WideToChar(line.FileName), line.LineNumber, column);
+				source.setFile(UTF::Convert<char, wchar_t>(std::wstring_view(line.FileName)), line.LineNumber, column);
 			frame.setSource(std::move(source));
 		}
 
@@ -109,12 +109,12 @@ namespace Backtrace
 
 	EExceptionResult OpenErrorModal(std::string_view title, std::string_view description, const Backtrace& backtrace)
 	{
-		std::wstring msg = UTF::CharToWide(description);
+		std::wstring msg = UTF::Convert<wchar_t, char>(description);
 		if (!backtrace.frames().empty())
-			msg += L"\n\n" + UTF::CharToWide(backtrace.toString());
+			msg += L"\n\n" + UTF::Convert<wchar_t, char>(backtrace.toString());
 		std::wstring caption = title.empty()
 								   ? L"Error"
-								   : L"Error: " + UTF::CharToWide(title);
+								   : L"Error: " + UTF::Convert<wchar_t, char>(title);
 		int          result  = MessageBoxW(nullptr,
                                  msg.c_str(),
                                  caption.c_str(),

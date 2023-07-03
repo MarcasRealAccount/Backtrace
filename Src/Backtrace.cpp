@@ -42,7 +42,7 @@ namespace Backtrace
 	std::string SourceLocation::toString() const
 	{
 		std::ostringstream str;
-		str << UTF::WideToChar(m_File.native())
+		str << UTF::Convert<char, std::filesystem::path::value_type>(m_File.native())
 			<< '(' << m_Line << ':' << m_Column << "): "
 			<< m_Function << "()";
 		return str.str();

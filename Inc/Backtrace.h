@@ -258,7 +258,7 @@ namespace Backtrace
 		requires(F&& f, Args&&... args) {
 			{
 				f(std::forward<Args>(args)...)
-				} -> std::same_as<R>;
+			} -> std::same_as<R>;
 		};
 
 	template <class F, class... Args>
@@ -313,11 +313,11 @@ namespace Backtrace
 
 	inline void AssertImpl(bool condition, std::string_view message)
 	{
-		if constexpr (CommonBuild::c_IsConfigDebug)
+		if constexpr (Common::c_IsConfigDebug)
 		{
 			if (!condition)
 			{
-				if constexpr (!CommonBuild::c_IsConfigDist)
+				if constexpr (!Common::c_IsConfigDist)
 					DebugBreak();
 
 				throw Exception("Assertion", std::string { message }, Capture(1, 10));
@@ -329,11 +329,11 @@ namespace Backtrace
 	template <class... Args>
 	void Assert(bool condition, fmt::format_string<Args...> format, Args&&... args)
 	{
-		if constexpr (CommonBuild::c_IsConfigDebug)
+		if constexpr (Common::c_IsConfigDebug)
 		{
 			if (!condition)
 			{
-				if constexpr (!CommonBuild::c_IsConfigDist)
+				if constexpr (!Common::c_IsConfigDist)
 					DebugBreak();
 
 				throw Exception("Assertion", fmt::format(format, std::forward<Args>(args)...), Capture(1, 10));
@@ -344,11 +344,11 @@ namespace Backtrace
 	template <class... Args>
 	void Assert(bool condition, std::format_string<Args...> format, Args&&... args)
 	{
-		if constexpr (CommonBuild::c_IsConfigDebug)
+		if constexpr (Common::c_IsConfigDebug)
 		{
 			if (!condition)
 			{
-				if constexpr (!CommonBuild::c_IsConfigDist)
+				if constexpr (!Common::c_IsConfigDist)
 					DebugBreak();
 
 				throw Exception("Assertion", std::format(format, std::forward<Args>(args)...), Capture(1, 10));
