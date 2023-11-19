@@ -1,86 +1,48 @@
 #pragma once
 
+#include "Build.h"
+
 #include <cstddef>
 
+#include <string_view>
 #include <filesystem>
-#include <stdexcept>
-#include <string>
-#include <utility>
 #include <vector>
 
-#include <Build.h>
-
-#ifdef BACKTRACE_FORMATTING
-	#ifdef BACKTRACE_SPDLOG
-		#include <spdlog/fmt/fmt.h>
-		#define BACKTRACE_USE_FMT
-	#elif defined(BACKTRACE_FMT)
-		#include <fmt/format.h>
-		#define BACKTRACE_USE_FMT
-	#else
-		#include <format>
-		#define BACKTRACE_USE_STD
-	#endif
-#endif
+// TODO(MarcasRealAccount): Migrate to CommonBuild package
+namespace Common
+{
+	template <class F, class... Args>
+	using InvokeResult = decltype(std::declval<F>()(std::declval<Args>()...));
+	template <class F, class... Args>
+	concept Invocable = requires(F&& f, Args&&... args) { f(std::forward<Args>(args)...); };
+	template <class F, class R, class... Args>
+	concept InvocableReturn = Invocable<F, Args...> && std::convertible_to<InvokeResult<F, Args...>, R>;
+} // namespace Common
+// ENDTODO
 
 namespace Backtrace
 {
+	static constexpr bool c_EnableAsserts    = Common::c_IsConfigDebug;
+	static constexpr bool c_EnableBreakpoint = !Common::c_IsConfigDist;
+
 	struct SourceLocation
 	{
 	public:
-		SourceLocation()
-			: m_Line(0),
-			  m_Column(0) {}
+		SourceLocation() noexcept;
+		SourceLocation(const SourceLocation& copy) noexcept;
+		SourceLocation(SourceLocation&& move) noexcept;
+		SourceLocation& operator=(const SourceLocation& copy) noexcept;
+		SourceLocation& operator=(SourceLocation&& move) noexcept;
 
-		SourceLocation(const SourceLocation& copy)
-			: m_File(copy.m_File),
-			  m_Function(copy.m_Function),
-			  m_Line(copy.m_Line),
-			  m_Column(copy.m_Column) {}
+		void SetFile(std::filesystem::path file, std::size_t line, std::size_t column) noexcept;
+		void SetFunction(std::string function) noexcept;
 
-		SourceLocation(SourceLocation&& move) noexcept
-			: m_File(std::move(move.m_File)),
-			  m_Function(std::move(move.m_Function)),
-			  m_Line(move.m_Line),
-			  m_Column(move.m_Column) {}
+		auto& GetFile() const noexcept { return m_File; }
+		auto& GetFunction() const noexcept { return m_Function; }
+		auto  GetLine() const noexcept { return m_Line; }
+		auto  GetColumn() const noexcept { return m_Column; }
 
-		SourceLocation& operator=(const SourceLocation& copy)
-		{
-			m_File     = copy.m_File;
-			m_Function = copy.m_Function;
-			return *this;
-		}
-
-		SourceLocation& operator=(SourceLocation&& move) noexcept
-		{
-			m_File     = std::move(move.m_File);
-			m_Function = std::move(move.m_Function);
-			m_Line     = move.m_Line;
-			m_Column   = move.m_Column;
-			return *this;
-		}
-
-		void setFile(std::filesystem::path file, std::size_t line, std::size_t column)
-		{
-			m_File   = std::move(file);
-			m_Line   = line;
-			m_Column = column;
-		}
-
-		void setFunction(std::string function)
-		{
-			m_Function = std::move(function);
-		}
-
-		auto& file() const { return m_File; }
-
-		auto& function() const { return m_Function; }
-
-		auto line() const { return m_Line; }
-
-		auto column() const { return m_Column; }
-
-		std::string toString() const;
+		std::string ToString() const noexcept;
 
 	private:
 		std::filesystem::path m_File;
@@ -92,70 +54,21 @@ namespace Backtrace
 	struct StackFrame
 	{
 	public:
-		StackFrame()
-			: m_Address(nullptr),
-			  m_Offset(0) {}
+		StackFrame() noexcept;
+		StackFrame(const StackFrame& copy) noexcept;
+		StackFrame(StackFrame&& move) noexcept;
+		StackFrame& operator=(const StackFrame& copy) noexcept;
+		StackFrame& operator=(StackFrame&& move) noexcept;
 
-		StackFrame(void* address, std::size_t offset, SourceLocation source)
-			: m_Address(address),
-			  m_Offset(offset),
-			  m_Source(std::move(source)) {}
+		void SetAddress(void* address, std::size_t offset) noexcept;
+		void SetSource(SourceLocation source) noexcept;
 
-		StackFrame(const StackFrame& copy)
-			: m_Address(copy.m_Address),
-			  m_Offset(copy.m_Offset),
-			  m_Source(copy.m_Source)
-		{
-		}
+		auto  GetAddress() const noexcept { return m_Address; }
+		auto  GetOffset() const noexcept { return m_Offset; }
+		auto& GetSource() const noexcept { return m_Source; }
+		bool  HasSource() const noexcept { return !m_Source.GetFile().empty(); }
 
-		StackFrame(StackFrame&& move) noexcept
-			: m_Address(move.m_Address),
-			  m_Offset(move.m_Offset),
-			  m_Source(std::move(move.m_Source))
-		{
-			move.m_Address = nullptr;
-			move.m_Offset  = 0;
-		}
-
-		StackFrame& operator=(const StackFrame& copy)
-		{
-			m_Address = copy.m_Address;
-			m_Offset  = copy.m_Offset;
-			m_Source  = copy.m_Source;
-			return *this;
-		}
-
-		StackFrame& operator=(StackFrame&& move) noexcept
-		{
-			m_Address = move.m_Address;
-			m_Offset  = move.m_Offset;
-			m_Source  = std::move(move.m_Source);
-
-			move.m_Address = nullptr;
-			move.m_Offset  = 0;
-			return *this;
-		}
-
-		void setAddress(void* address, std::size_t offset)
-		{
-			m_Address = address;
-			m_Offset  = offset;
-		}
-
-		void setSource(SourceLocation source)
-		{
-			m_Source = std::move(source);
-		}
-
-		auto address() const { return m_Address; }
-
-		auto offset() const { return m_Offset; }
-
-		auto& source() const { return m_Source; }
-
-		bool hasSource() const { return !m_Source.file().empty(); }
-
-		std::string toString() const;
+		std::string ToString() const noexcept;
 
 	private:
 		void*          m_Address;
@@ -166,20 +79,43 @@ namespace Backtrace
 	struct Backtrace
 	{
 	public:
-		auto& frames() { return m_Frames; }
+		Backtrace() noexcept;
+		Backtrace(const Backtrace& copy) noexcept;
+		Backtrace(Backtrace&& move) noexcept;
+		Backtrace& operator=(const Backtrace& copy) noexcept;
+		Backtrace& operator=(Backtrace&& move) noexcept;
 
-		auto& frames() const { return m_Frames; }
+		void  SetFrames(std::vector<StackFrame> frames) noexcept;
+		auto& GetFrames() const noexcept { return m_Frames; }
 
-		std::string toString() const;
+		std::string ToString() const noexcept;
 
 	private:
 		std::vector<StackFrame> m_Frames;
 	};
 
-	Backtrace  Capture(std::uint32_t skip, std::uint32_t maxFrames);
-	Backtrace& LastBacktrace();
-	void       HookThrow();
-	void       UnhookThrow();
+	Backtrace Capture(std::size_t skip = 0, std::size_t frames = 10) noexcept;
+
+	struct Exception
+	{
+	public:
+		Exception(std::string title, std::string message, Backtrace backtrace = Capture()) noexcept;
+		Exception(const Exception& copy) noexcept;
+		Exception(Exception&& move) noexcept;
+		Exception& operator=(const Exception& copy) noexcept;
+		Exception& operator=(Exception&& move) noexcept;
+
+		auto& GetTitle() const noexcept { return m_Title; }
+		auto& GetMessage() const noexcept { return m_Message; }
+		auto& GetBacktrace() const noexcept { return m_Backtrace; }
+
+		std::string ToString() const noexcept;
+
+	private:
+		std::string m_Title;
+		std::string m_Message;
+		Backtrace   m_Backtrace;
+	};
 
 	enum class EExceptionResult
 	{
@@ -189,269 +125,121 @@ namespace Backtrace
 		Critical
 	};
 
-	EExceptionResult OpenErrorModal(std::string_view title, std::string_view description, const Backtrace& backtrace);
+	using ExceptionCallback = EExceptionResult (*)(void* userdata, const Exception& exception);
 
-	struct Exception
+	inline void             DebugBreak() noexcept;
+	EExceptionResult        OpenErrorModal(const Exception& exception) noexcept;
+	inline EExceptionResult DefaultExceptionCallback([[maybe_unused]] void* userdata, const Exception& exception) noexcept
 	{
-	public:
-		Exception(std::string title, std::string message, Backtrace backtrace = Capture(0, 10))
-			: m_Title(std::move(title)),
-			  m_Message(std::move(message)),
-			  m_Backtrace(std::move(backtrace))
-		{
-		}
+		return OpenErrorModal(exception);
+	}
 
-		Exception(const Exception& copy)
-			: m_Title(copy.m_Title),
-			  m_Message(copy.m_Message),
-			  m_Backtrace(copy.m_Backtrace)
-		{
-		}
+	Backtrace&       LastBacktrace() noexcept;
+	void             HookThrow() noexcept;
+	void             UnhookThrow() noexcept;
+	void             PushExceptionCallback(ExceptionCallback callback, void* userdata) noexcept;
+	void             PopExceptionCallback() noexcept;
+	EExceptionResult InvokeExceptionCallback(const Exception& exception) noexcept;
 
-		Exception(Exception&& move) noexcept
-			: m_Title(std::move(move.m_Title)),
-			  m_Message(std::move(move.m_Message)),
-			  m_Backtrace(std::move(move.m_Backtrace))
-		{
-		}
+	template <class... Args>
+	std::uint64_t SafeExecute(Common::Invocable<Args...> auto&& executor, Args&&... args);
 
-		Exception& operator=(const Exception& copy)
-		{
-			m_Title     = copy.m_Title;
-			m_Message   = copy.m_Message;
-			m_Backtrace = copy.m_Backtrace;
-			return *this;
-		}
+	constexpr void Assert(bool statement, std::string message);
+	constexpr void Assert(bool statement, Common::InvocableReturn<std::string> auto&& messageProvider);
+} // namespace Backtrace
 
-		Exception& operator=(Exception&& move) noexcept
-		{
-			m_Title     = std::move(move.m_Title);
-			m_Message   = std::move(move.m_Message);
-			m_Backtrace = std::move(move.m_Backtrace);
-			return *this;
-		}
+#if BUILD_IS_SYSTEM_WINDOWS
+	#include "Backtrace/Platforms/Windows/WindowsBacktrace.h"
+#endif
 
-		auto& title() const { return m_Title; }
+#include <utility>
 
-		auto& what() const { return m_Message; }
-
-		auto& backtrace() const { return m_Backtrace; }
-
-		std::string toString() const;
-
-	private:
-		std::string m_Title;
-		std::string m_Message;
-		Backtrace   m_Backtrace;
-	};
-
-	using ExceptionCallback = EExceptionResult (*)(const Exception& exception);
-
-	ExceptionCallback SetExceptionCallback(ExceptionCallback callback);
-
-	EExceptionResult InvokeExceptionCallback(const Exception& exception);
-
-	void DebugBreak();
-
-	template <class F, class R, class... Args>
-	concept Functor =
-		requires(F&& f, Args&&... args) {
-			{
-				f(std::forward<Args>(args)...)
-			} -> std::same_as<R>;
-		};
-
-	template <class F, class... Args>
-	std::uint32_t SafeExecute(F&& f, Args&&... args)
+namespace Backtrace
+{
+	template <class... Args>
+	std::uint64_t SafeExecute(Common::Invocable<Args...> auto&& executor, Args&&... args)
 	{
-		while (true)
+		std::uint64_t    code   = 0;
+		EExceptionResult result = EExceptionResult::Retry;
+		// PushExceptionCallback();
+		while (result == EExceptionResult::Retry)
 		{
 			try
 			{
-				if constexpr (Functor<F, std::uint32_t>)
+				if constexpr (std::convertible_to<Common::InvokeResult<decltype(executor), Args...>, std::uint64_t>)
 				{
-					return f(std::forward<Args>(args)...);
+					return static_cast<std::uint64_t>(executor(std::forward<Args>(args)...));
 				}
 				else
 				{
-					f(std::forward<Args>(args)...);
-					return 0;
+					executor(std::forward<Args>(args)...);
+					code   = 0;
+					result = EExceptionResult::Critical;
 				}
 			}
 			catch (const Exception& exception)
 			{
-				auto result = InvokeExceptionCallback(exception);
-				if (result == EExceptionResult::Critical)
-					return 0x7FFF'FFFF;
-				else if (result == EExceptionResult::Abort)
-					return 0x007F'FFFF;
-				else if (result == EExceptionResult::Ignore)
-					return 0;
+				result = InvokeExceptionCallback(exception);
+				switch (result)
+				{
+				case EExceptionResult::Ignore: code = 0x8080ULL; break;
+				case EExceptionResult::Abort: code = 0xC080ULL; break;
+				case EExceptionResult::Critical: code = 0xF080ULL; break;
+				default: break;
+				}
 			}
 			catch (const std::exception& exception)
 			{
-				auto result = InvokeExceptionCallback({ "std::exception", exception.what(), LastBacktrace() });
-				if (result == EExceptionResult::Critical)
-					return 0x7FFF'FFFF;
-				else if (result == EExceptionResult::Abort)
-					return 0x000'7FFF;
-				else if (result == EExceptionResult::Ignore)
-					return 0;
+				result = InvokeExceptionCallback(Exception { "std::exception", exception.what(), LastBacktrace() });
+				switch (result)
+				{
+				case EExceptionResult::Ignore: code = 0x8001ULL; break;
+				case EExceptionResult::Abort: code = 0xC001ULL; break;
+				case EExceptionResult::Critical: code = 0xF001ULL; break;
+				default: break;
+				}
 			}
 			catch (...)
 			{
-				auto result = InvokeExceptionCallback({ "Uncaught exception", "Uncaught exception occurred", LastBacktrace() });
-				if (result == EExceptionResult::Critical)
-					return 0x7FFF'FFFF;
-				else if (result == EExceptionResult::Abort)
-					return 0x0000'007F;
-				else if (result == EExceptionResult::Ignore)
-					return 0;
+				result = InvokeExceptionCallback(Exception { "Unknown exception", "Unknown exception occurred", LastBacktrace() });
+				switch (result)
+				{
+				case EExceptionResult::Ignore: code = 0x8000ULL; break;
+				case EExceptionResult::Abort: code = 0xC000ULL; break;
+				case EExceptionResult::Critical: code = 0xF000ULL; break;
+				default: break;
+				}
 			}
 		}
+		// PopExceptionCallback();
+		return code;
 	}
 
-	inline void AssertImpl(bool condition, std::string_view message)
+	constexpr void Assert(bool statement, std::string message)
 	{
-		if constexpr (Common::c_IsConfigDebug)
+		if constexpr (c_EnableAsserts)
 		{
-			if (!condition)
-			{
-				if constexpr (!Common::c_IsConfigDist)
-					DebugBreak();
+			if (statement)
+				return;
 
-				throw Exception("Assertion", std::string { message }, Capture(1, 10));
-			}
+			if constexpr (c_EnableBreakpoint)
+				DebugBreak();
+
+			throw Exception("Assert", std::move(message), Capture(1));
 		}
 	}
 
-#ifdef BACKTRACE_USE_FMT
-	template <class... Args>
-	void Assert(bool condition, fmt::format_string<Args...> format, Args&&... args)
+	constexpr void Assert(bool statement, Common::InvocableReturn<std::string> auto&& messageProvider)
 	{
-		if constexpr (Common::c_IsConfigDebug)
+		if constexpr (c_EnableAsserts)
 		{
-			if (!condition)
-			{
-				if constexpr (!Common::c_IsConfigDist)
-					DebugBreak();
+			if (statement)
+				return;
 
-				throw Exception("Assertion", fmt::format(format, std::forward<Args>(args)...), Capture(1, 10));
-			}
+			if constexpr (c_EnableBreakpoint)
+				DebugBreak();
+
+			throw Exception("Assert", static_cast<std::string>(messageProvider()), Capture(1));
 		}
 	}
-#elif defined(BACKTRACE_USE_STD)
-	template <class... Args>
-	void Assert(bool condition, std::format_string<Args...> format, Args&&... args)
-	{
-		if constexpr (Common::c_IsConfigDebug)
-		{
-			if (!condition)
-			{
-				if constexpr (!Common::c_IsConfigDist)
-					DebugBreak();
-
-				throw Exception("Assertion", std::format(format, std::forward<Args>(args)...), Capture(1, 10));
-			}
-		}
-	}
-#endif
 } // namespace Backtrace
-
-#ifdef BACKTRACE_USE_FMT
-template <>
-struct fmt::formatter<Backtrace::SourceLocation>
-{
-public:
-	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
-	{
-		return ctx.begin();
-	}
-
-	template <class FormatContext>
-	auto format(const Backtrace::SourceLocation& location, FormatContext& ctx) -> decltype(ctx.out())
-	{
-		return fmt::format_to(ctx.out(), "{}", location.toString());
-	}
-};
-
-template <>
-struct fmt::formatter<Backtrace::Backtrace>
-{
-public:
-	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
-	{
-		return ctx.begin();
-	}
-
-	template <class FormatContext>
-	auto format(const Backtrace::Backtrace& backtrace, FormatContext& ctx) -> decltype(ctx.out())
-	{
-		return fmt::format_to(ctx.out(), "{}", backtrace.toString());
-	}
-};
-
-template <>
-struct fmt::formatter<Backtrace::Exception>
-{
-public:
-	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
-	{
-		return ctx.begin();
-	}
-
-	template <class FormatContext>
-	auto format(const Backtrace::Exception& exception, FormatContext& ctx) -> decltype(ctx.out())
-	{
-		return fmt::format_to(ctx.out(), "{}", exception.toString());
-	}
-};
-#elif defined(BACKTRACE_USE_STD)
-template <>
-struct std::formatter<Backtrace::SourceLocation>
-{
-public:
-	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
-	{
-		return ctx.begin();
-	}
-
-	template <class FormatContext>
-	auto format(const Backtrace::SourceLocation& location, FormatContext& ctx) -> decltype(ctx.out())
-	{
-		return std::format_to(ctx.out(), "{}", location.toString());
-	}
-};
-
-template <>
-struct std::formatter<Backtrace::Backtrace>
-{
-public:
-	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
-	{
-		return ctx.begin();
-	}
-
-	template <class FormatContext>
-	auto format(const Backtrace::Backtrace& backtrace, FormatContext& ctx) -> decltype(ctx.out())
-	{
-		return std::format_to(ctx.out(), "{}", backtrace.toString());
-	}
-};
-
-template <>
-struct std::formatter<Backtrace::Exception>
-{
-public:
-	constexpr auto parse(format_parse_context& ctx) -> decltype(ctx.begin())
-	{
-		return ctx.begin();
-	}
-
-	template <class FormatContext>
-	auto format(const Backtrace::Exception& exception, FormatContext& ctx) -> decltype(ctx.out())
-	{
-		return std::format_to(ctx.out(), "{}", exception.toString());
-	}
-};
-#endif

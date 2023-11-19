@@ -8,6 +8,8 @@ workspace("Backtrace")
 	exceptionhandling("On")
 	flags("MultiProcessorCompile")
 
+	startproject("Test")
+
 	project("Backtrace")
 		location("%{wks.location}/")
 		warnings("Extra")
@@ -26,6 +28,25 @@ workspace("Backtrace")
 		filter("system:windows")
 			links({ "Dbghelp.lib" })
 		filter({})
+
+		pkgdeps({ "commonbuild" })
+
+		common:addActions()
+
+	project("Test")
+		location("%{wks.location}/")
+		warnings("Extra")
+
+		kind("ConsoleApp")
+		targetdir("%{wks.location}/Test/%{cfg.buildcfg}")
+		objdir("%{wks.location}/Test/%{cfg.buildcfg}")
+
+		includedirs({ "Test/" })
+		files({ "Test/**" })
+		removefiles({ "*.DS_Store" })
+
+		links({ "Backtrace" })
+		externalincludedirs({ "Inc/" })
 
 		pkgdeps({ "commonbuild" })
 
