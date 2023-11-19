@@ -6,7 +6,7 @@
 	#include <mutex>
 
 	#include <UTF/UTF.h>
-	#include <mimalloc.h>
+	#include <Memory/Memory.h>
 
 	#include <Windows.h>
 
@@ -43,7 +43,7 @@ namespace Backtrace
 		DWORD dskip   = (DWORD) std::min<std::size_t>(skip, std::numeric_limits<DWORD>::max());
 		DWORD dframes = (DWORD) std::min<std::size_t>(frames, std::numeric_limits<DWORD>::max());
 
-		void** framePtrs  = (void**) mi_malloc(dframes * sizeof(void*));
+		void** framePtrs  = (void**) Memory::Malloc(dframes * sizeof(void*));
 		WORD   frameCount = RtlCaptureStackBackTrace(dskip, dframes, framePtrs, nullptr);
 
 		std::uint8_t symbolBuffer[sizeof(SYMBOL_INFOW) + MAX_SYM_NAME * sizeof(wchar_t)];
@@ -77,7 +77,7 @@ namespace Backtrace
 			bframe.SetSource(std::move(source));
 		}
 
-		mi_free(framePtrs);
+		Memory::Free(framePtrs);
 		Backtrace backtrace;
 		backtrace.SetFrames(std::move(bframes));
 		return backtrace;
